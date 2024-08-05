@@ -76,4 +76,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: k8s-neighbours
-
+          tag_name: ${{ steps.next-version.outputs.VALUE }}
+          generate_release_notes: true
