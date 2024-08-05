@@ -1,0 +1,73 @@
+name: Create Release
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: 'The type of semantic version change to apply to the release.'
+        required: true
+        type: string
+        default: 'patch'
+
+jobs:
+  create-new-release:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Get previous version
+      id: previous-version
+      run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+    - name: Get next release version
+      id: next-version
+      run: |
+        array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
+        target=2
+        if [ ${{ inputs.release }} == "major" ]; then target=0; fi
+        if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
+        array[$target]=$((array[$target]+1))
+        if [ $target -lt 2 ]; then array[2]=0; fi
+        if [ $target -lt 1 ]; then array[1]=0; fi
+        output=$(IFS=. ; echo "${array[*]}")
+        echo "VALUE=$output" >> $GITHUB_OUTPUT
+
+    - name: Bump version
+      run: |
+        echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
+
+    - name: Generate version bump commit
+      run: |
+        git config user.name ${{ github.actor }}
+        git config user.email '${{ github.actor }}@users.noreply.github.com'
+        git commit -a -m "version bump ${{ steps.next-version.outputs.VALUE }}"
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    
+    - name: Create Pull Request
+      id: cpr
+      uses: peter-evans/create-pull-request@v4
+      with:
+        token: ${{ github.token }}
+        title: '[skip ci] Release'
+        branch: release
+        delete-branch: true
+        labels: release_auto_version_bump
+
+    - name: Merge
+      env:
+        GITHUB_TOKEN: ${{ secrets.APPROVER_PAT }}
+      run: |
+        gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{github.repository}} \
+          --admin --delete-branch --body "version bump ${{ steps.next-version.outputs.VALUE }}" -s
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        tag_name: ${{ steps.next-version.outputs.VALUE }}
+        release_name: ${{ steps.next-version.outputs.VALUE }}
+        draft: false
+        commitish: main # use the latest commit on main branch (including the new version)
+        prerelease: false
