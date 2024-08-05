@@ -67,7 +67,7 @@ jobs:
 
       - name: Merge
         env:
-          GITHUB_TOKEN: ${{ secrets.APPROVER_PAT }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{github.repository}} \
             --admin --delete-branch --body "version bump ${{ steps.next-version.outputs.VALUE }}" -s
