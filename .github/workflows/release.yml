@@ -23,58 +23,65 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Build
-        run: go build -v ./...
-
-      - name: Get previous version
-        id: previous-version
-        run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
-
-      - name: Get next release version
-        id: next-version
-        run: |
-          array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
-          target=2
-          if [ ${{ inputs.release }} == "major" ]; then target=0; fi
-          if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
-          array[$target]=$((array[$target]+1))
-          if [ $target -lt 2 ]; then array[2]=0; fi
-          if [ $target -lt 1 ]; then array[1]=0; fi
-          output=$(IFS=. ; echo "${array[*]}")
-          echo "VALUE=$output" >> $GITHUB_OUTPUT
-
-      - name: Bump version
-        run: |
-          echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
-
-      - name: Generate version bump commit
-        run: |
-          git config user.name ${{ github.actor }}
-          git config user.email '${{ github.actor }}@users.noreply.github.com'
-          git commit -a -m "version bump ${{ steps.next-version.outputs.VALUE }}"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Create Pull Request
-        id: cpr
-        uses: peter-evans/create-pull-request@v4
+      - name: Generate build files
+        uses: thatisuday/go-cross-build@v1
         with:
-          token: ${{ github.token }}
-          title: "[skip ci] Release"
-          branch: release
-          delete-branch: true
-          labels: release_auto_version_bump
+            platforms: 'linux/amd64, darwin/amd64, darwin/arm64'
+            name: 'program'
+            compress: 'false'
+            dest: '.'
 
-      - name: Merge
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{ github.repository }} \
-            --admin --delete-branch --body "Release ${{ steps.next-version.outputs.VALUE }}" -s
+      - run: ls -la
 
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: k8s-neighbours
-          tag_name: ${{ steps.next-version.outputs.VALUE }}
-          generate_release_notes: true
+      # - name: Get previous version
+      #   id: previous-version
+      #   run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
+      #
+      # - name: Get next release version
+      #   id: next-version
+      #   run: |
+      #     array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
+      #     target=2
+      #     if [ ${{ inputs.release }} == "major" ]; then target=0; fi
+      #     if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
+      #     array[$target]=$((array[$target]+1))
+      #     if [ $target -lt 2 ]; then array[2]=0; fi
+      #     if [ $target -lt 1 ]; then array[1]=0; fi
+      #     output=$(IFS=. ; echo "${array[*]}")
+      #     echo "VALUE=$output" >> $GITHUB_OUTPUT
+      #
+      # - name: Bump version
+      #   run: |
+      #     echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
+      #
+      # - name: Generate version bump commit
+      #   run: |
+      #     git config user.name ${{ github.actor }}
+      #     git config user.email '${{ github.actor }}@users.noreply.github.com'
+      #     git commit -a -m "version bump ${{ steps.next-version.outputs.VALUE }}"
+      #   env:
+      #     GITHUB_TOKEN: ${{ github.token }}
+      #
+      # - name: Create Pull Request
+      #   id: cpr
+      #   uses: peter-evans/create-pull-request@v4
+      #   with:
+      #     token: ${{ github.token }}
+      #     title: "[skip ci] Release"
+      #     branch: release
+      #     delete-branch: true
+      #     labels: release_auto_version_bump
+      #
+      # - name: Merge
+      #   env:
+      #     GITHUB_TOKEN: ${{ github.token }}
+      #   run: |
+      #     gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{ github.repository }} \
+      #       --admin --delete-branch --body "Release ${{ steps.next-version.outputs.VALUE }}" -s
+      #
+      # - name: Release
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     files: k8s-neighbours
+      #     tag_name: ${{ steps.next-version.outputs.VALUE }}
+      #     generate_release_notes: true
