@@ -2,8 +2,6 @@ module github.com/mosheavni/k8s-neighbours
 
 go 1.22.0
 
-toolchain go1.22.5
-
 require (
 	github.com/nleeper/goment v1.4.4
 	github.com/olekukonko/tablewriter v0.0.5
