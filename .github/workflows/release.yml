@@ -79,7 +79,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           tag_name: ${{ steps.next-version.outputs.VALUE }}
-          release_name: ${{ steps.next-version.outputs.VALUE }}
+          release_name: Release ${{ steps.next-version.outputs.VALUE }}
           draft: false
           commitish: main # use the latest commit on main branch (including the new version)
           prerelease: false
