@@ -69,27 +69,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{github.repository}} \
-            --admin --delete-branch --body "version bump ${{ steps.next-version.outputs.VALUE }}" -s
+          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{ github.repository }} \
+            --admin --delete-branch --body "Release ${{ steps.next-version.outputs.VALUE }}" -s
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.next-version.outputs.VALUE }}
-          release_name: Release ${{ steps.next-version.outputs.VALUE }}
-          draft: false
-          commitish: main # use the latest commit on main branch (including the new version)
-          prerelease: false
+          files: k8s-neighbours
 
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./k8s-neighbours
-          asset_name: k8s-neighbours
