@@ -25,6 +25,38 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Get previous version
+        id: previous-version
+        run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Get next release version
+        id: next-version
+        run: |
+          array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
+          target=2
+          if [ ${{ inputs.release }} == "major" ]; then target=0; fi
+          if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
+          array[$target]=$((array[$target]+1))
+          if [ $target -lt 2 ]; then array[2]=0; fi
+          if [ $target -lt 1 ]; then array[1]=0; fi
+          output=$(IFS=. ; echo "${array[*]}")
+          echo "VALUE=$output" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        run: |
+          echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
+
+      - name: Create tag
+        uses: actions/github-script@v5
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ steps.next-version.outputs.VALUE }}',
+              sha: context.sha
+            })
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -33,27 +65,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
-
-      # - name: Get previous version
-      #   id: previous-version
-      #   run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
-      #
-      # - name: Get next release version
-      #   id: next-version
-      #   run: |
-      #     array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
-      #     target=2
-      #     if [ ${{ inputs.release }} == "major" ]; then target=0; fi
-      #     if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
-      #     array[$target]=$((array[$target]+1))
-      #     if [ $target -lt 2 ]; then array[2]=0; fi
-      #     if [ $target -lt 1 ]; then array[1]=0; fi
-      #     output=$(IFS=. ; echo "${array[*]}")
-      #     echo "VALUE=$output" >> $GITHUB_OUTPUT
-      #
-      # - name: Bump version
-      #   run: |
-      #     echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
       #
       # - name: Generate version bump commit
       #   run: |
