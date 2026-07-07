@@ -1,3 +1,5 @@
+// Command k8s-neighbours lists all pods scheduled on the same Kubernetes
+// node as a given pod, or on a given node directly.
 package main
 
 import (
@@ -5,125 +7,118 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
-	"github.com/nleeper/goment"
-	"github.com/olekukonko/tablewriter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/mosheavni/k8s-neighbours/internal/neighbours"
+)
+
+const inClusterNamespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+// Populated by GoReleaser via ldflags.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 func main() {
-	var podName string
-	flag.StringVar(&podName, "pod", "", "Name of the pod")
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(1)
+	}
+}
 
-	var nodeName string
-	flag.StringVar(&nodeName, "node", "", "Name of the node")
-
-	var namespace string
-	flag.StringVar(&namespace, "namespace", "", "Namespace of the pod")
-
-	// parse flags
+func run() error {
+	podName := flag.String("pod", "", "name of the pod whose node neighbours to list")
+	nodeName := flag.String("node", "", "name of the node to list pods from")
+	namespace := flag.String("namespace", "", "namespace of the pod (defaults to the current kubeconfig namespace)")
+	showVersion := flag.Bool("version", false, "print version information and exit")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s (-pod <pod_name> [-namespace <namespace>] | -node <node_name>)\n\n", os.Args[0])
+		fmt.Fprintln(flag.CommandLine.Output(), "List all pods scheduled on the same node as a pod, or on a node directly.")
+		fmt.Fprintln(flag.CommandLine.Output(), "\nFlags:")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
-	// allow either pod or node name
-	if podName == "" && nodeName == "" {
-		programName := os.Args[0]
-		fmt.Printf("Usage: %s -pod <pod_name> -node <node_name> [-namespace <namespace>]\n", programName)
-		os.Exit(1)
+	if *showVersion {
+		fmt.Printf("k8s-neighbours %s (commit %s, built %s)\n", version, commit, date)
+		return nil
 	}
 
-	config, err := rest.InClusterConfig()
+	if (*podName == "") == (*nodeName == "") {
+		flag.Usage()
+		return fmt.Errorf("exactly one of -pod or -node is required")
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	config, ns, err := buildConfig(*namespace)
 	if err != nil {
+		return err
+	}
 
-		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-		// if you want to change the loading rules (which files in which order), you can do so here
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("creating Kubernetes client: %w", err)
+	}
 
-		configOverrides := &clientcmd.ConfigOverrides{}
-		// if you want to change override values or bind them to flags, there are methods to help you
-
-		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-		config, err = kubeConfig.ClientConfig()
-
+	node := *nodeName
+	if *podName != "" {
+		node, err = neighbours.ResolveNode(ctx, client, ns, *podName)
 		if err != nil {
-			fmt.Println("Error creating Kubernetes config:", err)
-			os.Exit(1)
+			return err
 		}
+	} else if _, err := client.CoreV1().Nodes().Get(ctx, node, metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("getting node %s: %w", node, err)
+	}
+
+	fmt.Printf("Node: %s\n", node)
+
+	rows, err := neighbours.ListNeighbours(ctx, client, node)
+	if err != nil {
+		return err
+	}
+	return neighbours.Render(os.Stdout, rows)
+}
+
+// buildConfig returns a rest.Config (in-cluster first, kubeconfig fallback)
+// and the namespace to use when one was not passed explicitly.
+func buildConfig(namespace string) (*rest.Config, string, error) {
+	if config, err := rest.InClusterConfig(); err == nil {
 		if namespace == "" {
-			namespace, _, err = kubeConfig.Namespace()
-
-			if err != nil {
-				fmt.Println("Error getting namespace:", err)
-				os.Exit(1)
-			}
+			namespace = inClusterNamespace()
 		}
+		return config, namespace, nil
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		fmt.Println("Error creating Kubernetes client:", err)
-		os.Exit(1)
+		return nil, "", fmt.Errorf("creating Kubernetes config: %w", err)
 	}
-
-	if podName != "" {
-		pod, err := clientset.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			fmt.Println("Error getting pod:", err)
-			os.Exit(1)
+	if namespace == "" {
+		if namespace, _, err = kubeConfig.Namespace(); err != nil {
+			return nil, "", fmt.Errorf("getting namespace from kubeconfig: %w", err)
 		}
-		nodeName = pod.Spec.NodeName
 	}
+	return config, namespace, nil
+}
 
-	fmt.Printf("Node Name: %s\n", nodeName)
-	if nodeName == "" {
-		fmt.Println("Pod is not scheduled on any node")
-		os.Exit(1)
-	}
-	_, err = clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil {
-		fmt.Println("Error getting node:", err)
-		os.Exit(1)
-	}
-
-	listOptions := metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
-	}
-
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), listOptions)
-	if err != nil {
-		fmt.Println("Error getting pods:", err)
-		os.Exit(1)
-	}
-
-	rows := [][]string{}
-
-	for _, pod := range pods.Items {
-		containerStatuses := pod.Status.ContainerStatuses
-		containersReady := 0
-		for _, containerStatus := range containerStatuses {
-			if containerStatus.Ready {
-				containersReady++
-			}
+func inClusterNamespace() string {
+	if data, err := os.ReadFile(inClusterNamespacePath); err == nil {
+		if ns := strings.TrimSpace(string(data)); ns != "" {
+			return ns
 		}
-
-		timeFromStart, err := goment.New(pod.CreationTimestamp.Time.Format("2006-01-02T15:04:05-0700"))
-		if err != nil {
-			fmt.Println("Error getting pod creation time:", err)
-			os.Exit(1)
-		}
-
-		fromNow := timeFromStart.FromNow()
-
-		containersLen := len(pod.Spec.Containers)
-		rows = append(rows, []string{pod.Namespace, pod.Name, fmt.Sprintf("%d/%d", containersReady, containersLen), fromNow})
 	}
-
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Namespace", "Name", "Containers", "Age"})
-
-	for _, v := range rows {
-		table.Append(v)
-	}
-	table.Render() // Send output
+	return metav1.NamespaceDefault
 }
