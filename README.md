@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/mosheavni/k8s-neighbours/actions/workflows/ci.yml/badge.svg)](https://github.com/mosheavni/k8s-neighbours/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/mosheavni/k8s-neighbours)](https://github.com/mosheavni/k8s-neighbours/releases/latest)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mosheavni/k8s-neighbours)](https://goreportcard.com/report/github.com/mosheavni/k8s-neighbours)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mosheavni/k8s-neighbours.svg)](https://pkg.go.dev/github.com/mosheavni/k8s-neighbours)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A small CLI that lists all pods scheduled on the same Kubernetes node as a
