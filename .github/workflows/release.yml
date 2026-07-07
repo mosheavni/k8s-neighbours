@@ -1,99 +1,36 @@
-name: Create Release
+name: Release
 
 on:
   push:
-    branches: ["master"]
-  pull_request:
-    branches: ["master"]
-  workflow_dispatch:
-    inputs:
-      release:
-        description: "The type of semantic version change to apply to the release."
-        required: true
-        type: string
-        default: "patch"
+    tags: ["v*"]
+
+permissions:
+  contents: write
 
 jobs:
-  create-new-release:
-    runs-on: ubuntu-20.04
+  goreleaser:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-
-      - name: Get previous version
-        id: previous-version
-        run: echo "VALUE=$(cat VERSION)" >> $GITHUB_OUTPUT
-
-      - name: Get next release version
-        id: next-version
-        run: |
-          array=($(echo ${{ steps.previous-version.outputs.VALUE }} | tr . '\n'))
-          target=2
-          if [ ${{ inputs.release }} == "major" ]; then target=0; fi
-          if [ ${{ inputs.release }} == "minor" ]; then target=1; fi
-          array[$target]=$((array[$target]+1))
-          if [ $target -lt 2 ]; then array[2]=0; fi
-          if [ $target -lt 1 ]; then array[1]=0; fi
-          output=$(IFS=. ; echo "${array[*]}")
-          echo "VALUE=$output" >> $GITHUB_OUTPUT
-
-      - name: Bump version
-        run: |
-          echo "${{ steps.next-version.outputs.VALUE }}" > VERSION
-
-      - name: Create tag
-        uses: actions/github-script@v5
-        with:
-          script: |
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'refs/tags/${{ steps.next-version.outputs.VALUE }}',
-              sha: context.sha
-            })
+          go-version-file: go.mod
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          # 'latest', 'nightly', or a semver
-          version: '~> v2'
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      #
-      # - name: Generate version bump commit
-      #   run: |
-      #     git config user.name ${{ github.actor }}
-      #     git config user.email '${{ github.actor }}@users.noreply.github.com'
-      #     git commit -a -m "version bump ${{ steps.next-version.outputs.VALUE }}"
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #
-      # - name: Create Pull Request
-      #   id: cpr
-      #   uses: peter-evans/create-pull-request@v4
-      #   with:
-      #     token: ${{ github.token }}
-      #     title: "[skip ci] Release"
-      #     branch: release
-      #     delete-branch: true
-      #     labels: release_auto_version_bump
-      #
-      # - name: Merge
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #   run: |
-      #     gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --repo ${{ github.repository }} \
-      #       --admin --delete-branch --body "Release ${{ steps.next-version.outputs.VALUE }}" -s
-      #
-      # - name: Release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     files: k8s-neighbours
-      #     tag_name: ${{ steps.next-version.outputs.VALUE }}
-      #     generate_release_notes: true
+
+  krew:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Update Krew index
+        uses: rajatjindal/krew-release-bot@v0.0.47

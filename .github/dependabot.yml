@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      golang.org-dependencies:
+        patterns:
+          - "golang.org/*"
+      go-openapi-dependencies:
+        patterns:
+          - "github.com/go-openapi/*"
+      kubernetes-dependencies:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      development-dependencies:
+        patterns:
+          - "*"
