@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  # defaults already include errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+  settings:
+    errcheck:
+      # write errors to tabwriter/stderr surface at Flush or are unactionable
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
