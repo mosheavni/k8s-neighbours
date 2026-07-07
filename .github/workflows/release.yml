@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # manual trigger: pick the tag (not a branch) in the "Run workflow" ref
+  # dropdown — GoReleaser requires the checked-out commit to be tagged
+  workflow_dispatch:
 
 permissions:
   contents: write
