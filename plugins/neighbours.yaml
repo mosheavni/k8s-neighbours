@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   name: neighbours
 spec:
-  version: v0.1.0
+  version: v0.2.0
   homepage: https://github.com/mosheavni/k8s-neighbours
   shortDescription: List pods on the same node as a given pod
   description: |
@@ -14,41 +14,41 @@ spec:
       matchLabels:
         os: linux
         arch: amd64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_linux_amd64.tar.gz
-    sha256: b392dd215d0d4c90d6791ce0942db4154a72133b405f3ee19eed984328298422
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_linux_amd64.tar.gz
+    sha256: 91520ac23e82778a4fec215f9db9c28433e5302f484c6a93ad0a7e08f4687b97
     bin: kubectl-neighbours
   - selector:
       matchLabels:
         os: linux
         arch: arm64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_linux_arm64.tar.gz
-    sha256: 3e2773582e55b6fd06ef6845b0fcba810ebb75c4d0b3c41aae54829311761953
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_linux_arm64.tar.gz
+    sha256: 30fe4f5c178a520ce474992d33ac154e1499500375767e2bb8d3c452d540a45b
     bin: kubectl-neighbours
   - selector:
       matchLabels:
         os: darwin
         arch: amd64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_darwin_amd64.tar.gz
-    sha256: 44c9d52a18147e861bd169c2c6bd39ac6de52cd39b1ed474e9c273acb07dc59c
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_darwin_amd64.tar.gz
+    sha256: f3f395ea8cb1f8c358c4a90bb1aeb86e1ee55d6da88faca9e10b8848f593daee
     bin: kubectl-neighbours
   - selector:
       matchLabels:
         os: darwin
         arch: arm64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_darwin_arm64.tar.gz
-    sha256: ae356da276bad3b11adfba6a52f1fca195cb54f2e80be6307e9e73624821e0bc
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_darwin_arm64.tar.gz
+    sha256: 93b75ccc2784d4f41286281cb2524c1d92a5f060cc74f91ef3caf0ecc3c557bf
     bin: kubectl-neighbours
   - selector:
       matchLabels:
         os: windows
         arch: amd64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_windows_amd64.zip
-    sha256: 2fc43694c28b88b756db283c1790b1a2f475e8df871224ca1352b5099ea6b305
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_windows_amd64.zip
+    sha256: e79ca0d0ab45f691a90b62be4a22383c282533b1cb16ee6c640be04075e86076
     bin: kubectl-neighbours.exe
   - selector:
       matchLabels:
         os: windows
         arch: arm64
-    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_windows_arm64.zip
-    sha256: d0f00d62ee5a3f420ed272e70da41cf03baf07dfec47cfc63dac024c0c752d7f
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.2.0/k8s-neighbours_windows_arm64.zip
+    sha256: fa15bb482a3921d37a4785cbcd22a30b7a1316e441913b7377acd78ce84cb337
     bin: kubectl-neighbours.exe
