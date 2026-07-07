@@ -1,0 +1,54 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: neighbours
+spec:
+  version: v0.1.0
+  homepage: https://github.com/mosheavni/k8s-neighbours
+  shortDescription: List pods on the same node as a given pod
+  description: |
+    Lists all pods scheduled on the same Kubernetes node as a given pod,
+    or all pods running on a given node, across all namespaces.
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_linux_amd64.tar.gz
+    sha256: b392dd215d0d4c90d6791ce0942db4154a72133b405f3ee19eed984328298422
+    bin: kubectl-neighbours
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_linux_arm64.tar.gz
+    sha256: 3e2773582e55b6fd06ef6845b0fcba810ebb75c4d0b3c41aae54829311761953
+    bin: kubectl-neighbours
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_darwin_amd64.tar.gz
+    sha256: 44c9d52a18147e861bd169c2c6bd39ac6de52cd39b1ed474e9c273acb07dc59c
+    bin: kubectl-neighbours
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_darwin_arm64.tar.gz
+    sha256: ae356da276bad3b11adfba6a52f1fca195cb54f2e80be6307e9e73624821e0bc
+    bin: kubectl-neighbours
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_windows_amd64.zip
+    sha256: 2fc43694c28b88b756db283c1790b1a2f475e8df871224ca1352b5099ea6b305
+    bin: kubectl-neighbours.exe
+  - selector:
+      matchLabels:
+        os: windows
+        arch: arm64
+    uri: https://github.com/mosheavni/k8s-neighbours/releases/download/v0.1.0/k8s-neighbours_windows_arm64.zip
+    sha256: d0f00d62ee5a3f420ed272e70da41cf03baf07dfec47cfc63dac024c0c752d7f
+    bin: kubectl-neighbours.exe

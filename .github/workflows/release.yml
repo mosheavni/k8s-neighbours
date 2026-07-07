@@ -29,11 +29,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-  krew:
+  # this repo is also a self-hosted krew index: the plugins/ directory holds
+  # the manifest, regenerated and committed to master on every release
+  krew-index:
     needs: goreleaser
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: master
 
-      - name: Update Krew index
-        uses: rajatjindal/krew-release-bot@v0.0.51
+      - name: Download release checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$GITHUB_REF_NAME" --pattern checksums.txt --output checksums.txt
+
+      - name: Generate krew manifest
+        run: hack/generate-krew-manifest.sh "$GITHUB_REF_NAME" checksums.txt
+
+      - name: Commit and push manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add plugins/neighbours.yaml
+          git diff --cached --quiet && { echo "manifest unchanged"; exit 0; }
+          git commit -m "chore: update krew manifest for $GITHUB_REF_NAME"
+          git push origin master

@@ -33,10 +33,17 @@ go install github.com/mosheavni/k8s-neighbours@latest
 ### Krew (kubectl plugin)
 
 The binary is named `kubectl-neighbours`, so once on your `PATH` it also works
-as a kubectl plugin: `kubectl neighbours -pod my-pod`. A
-[Krew](https://krew.sigs.k8s.io/) manifest is published on each release;
-installation via `kubectl krew install neighbours` will work once the plugin
-is accepted into the krew-index.
+as a kubectl plugin: `kubectl neighbours -pod my-pod`.
+
+This repository doubles as a self-hosted
+[custom Krew index](https://krew.sigs.k8s.io/docs/developer-guide/custom-indexes/)
+(manifest in `plugins/`, updated automatically on every release):
+
+```sh
+kubectl krew index add mosheavni https://github.com/mosheavni/k8s-neighbours.git
+kubectl krew install mosheavni/neighbours
+kubectl neighbours -pod my-pod
+```
 
 ## Usage
 
@@ -90,14 +97,17 @@ make snapshot   # local multi-platform release build (requires goreleaser)
 
 ## Releasing
 
-Releases are tag-driven. Push a semver tag and CI does the rest (GoReleaser
-builds linux/darwin/windows × amd64/arm64 and publishes a GitHub release; the
-Krew manifest is updated by krew-release-bot):
+Releases are tag-driven. Either run the **Tag Release** workflow from the
+Actions tab (pick patch/minor/major), or push a semver tag manually:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
+
+CI does the rest: GoReleaser builds linux/darwin/windows × amd64/arm64,
+publishes a GitHub release, and the Krew manifest in `plugins/` is
+regenerated from the release checksums and committed to master.
 
 Note: mark the `CI` workflow as a required status check in branch protection
 so Dependabot auto-merge waits for it.
