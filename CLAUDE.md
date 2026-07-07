@@ -1,0 +1,40 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+k8s-neighbours is a Go CLI that lists all pods scheduled on the same Kubernetes node as a given pod (or on a given node directly). The binary is named `kubectl-neighbours` so it doubles as a kubectl plugin (`kubectl neighbours`).
+
+## Commands
+
+```sh
+make build            # build ./kubectl-neighbours
+make test             # go test -race -coverprofile=coverage.out ./...
+make lint             # golangci-lint run (config in .golangci.yml, v2 format)
+make fmt              # gofmt -w .
+make snapshot         # goreleaser release --snapshot --clean (local multi-platform build)
+go run . -pod <pod_name> [-namespace <ns>]   # run against a pod
+go run . -node <node_name>                   # run against a node
+```
+
+Running against a cluster requires a reachable Kubernetes cluster (kubeconfig or in-cluster). Tests do not — they use the fake clientset. Go version comes from `go.mod` (also pinned in `.go-version`).
+
+## Architecture
+
+- `main.go` — thin entrypoint: flag parsing (`-pod`/`-node` mutually exclusive, one required; `-namespace`; `-version`), signal-aware context, client config (in-cluster first, kubeconfig fallback; namespace defaults from kubeconfig context or the in-cluster serviceaccount namespace file). Errors go to stderr via the `run() error` pattern. `version`/`commit`/`date` vars are injected by GoReleaser ldflags.
+- `internal/neighbours/` — testable logic taking `kubernetes.Interface`:
+  - `ResolveNode` — pod → node via `pod.Spec.NodeName`
+  - `ListNeighbours` — lists pods cluster-wide with field selector `spec.nodeName=<node>`, builds `PodRow`s (READY count, kubectl-like STATUS, AGE via `duration.HumanDuration`)
+  - `Render` — kubectl-style table via `text/tabwriter`
+  - package-level `now` var is the clock hook for AGE tests
+
+## Testing notes
+
+Tests use `k8s.io/client-go/kubernetes/fake`. The fake clientset **ignores field selectors on List**, so `neighbours_test.go` prepends a reactor that filters by `spec.nodeName` — keep that reactor if you touch list behavior.
+
+## CI / Releases
+
+- `.github/workflows/ci.yml` (PRs + master pushes): gofmt check, go vet, golangci-lint, `go test -race`, GoReleaser config check + snapshot build.
+- Releases are **tag-driven**: pushing a `v*` tag runs `.github/workflows/release.yml` — GoReleaser builds linux/darwin/windows × amd64/arm64 (CGO disabled) and publishes the GitHub release, then krew-release-bot updates the Krew manifest (template: `.krew.yaml`, plugin name `neighbours`). First krew-index submission is a manual one-time PR.
+- Dependabot (`.github/dependabot.yml`) groups gomod + github-actions updates; `.github/workflows/auto-merge.yml` auto-approves and auto-merges matching groups (merge waits on required checks — CI should be a required status check).
