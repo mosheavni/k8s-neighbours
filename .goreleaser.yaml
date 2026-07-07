@@ -35,6 +35,8 @@ archives:
     files:
       - LICENSE
       - README.md
+      - src: hack/kubectl_complete-neighbours
+        dst: kubectl_complete-neighbours
 
 checksum:
   name_template: checksums.txt

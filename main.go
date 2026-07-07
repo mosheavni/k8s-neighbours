@@ -4,13 +4,13 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
+	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -29,51 +29,61 @@ var (
 )
 
 func main() {
-	if err := run(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := newRootCmd().ExecuteContext(ctx)
+	stop()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	podName := flag.String("pod", "", "name of the pod whose node neighbours to list")
-	nodeName := flag.String("node", "", "name of the node to list pods from")
-	namespace := flag.String("namespace", "", "namespace of the pod (defaults to the current kubeconfig namespace)")
-	showVersion := flag.Bool("version", false, "print version information and exit")
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s (-pod <pod_name> [-namespace <namespace>] | -node <node_name>)\n\n", os.Args[0])
-		fmt.Fprintln(flag.CommandLine.Output(), "List all pods scheduled on the same node as a pod, or on a node directly.")
-		fmt.Fprintln(flag.CommandLine.Output(), "\nFlags:")
-		flag.PrintDefaults()
+func newRootCmd() *cobra.Command {
+	var nodeName, namespace string
+
+	cmd := &cobra.Command{
+		Use:   "kubectl-neighbours [pod]",
+		Short: "List all pods scheduled on the same node as a pod, or on a node directly",
+		Example: `  # pods on the same node as a pod
+  kubectl neighbours my-pod-abc123 -n my-namespace
+
+  # pods on a specific node
+  kubectl neighbours --node ip-10-0-1-23.ec2.internal`,
+		Args:              cobra.MaximumNArgs(1),
+		Version:           fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),
+		SilenceUsage:      true,
+		SilenceErrors:     true,
+		ValidArgsFunction: completePods(&namespace),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			podName := ""
+			if len(args) == 1 {
+				podName = args[0]
+			}
+			if (podName == "") == (nodeName == "") {
+				return fmt.Errorf("exactly one of a pod name argument or --node is required")
+			}
+			return run(cmd.Context(), podName, nodeName, namespace)
+		},
 	}
-	flag.Parse()
 
-	if *showVersion {
-		fmt.Printf("k8s-neighbours %s (commit %s, built %s)\n", version, commit, date)
-		return nil
-	}
+	cmd.Flags().StringVar(&nodeName, "node", "", "name of the node to list pods from")
+	cmd.Flags().StringVarP(&namespace, "namespace", "n", "", "namespace of the pod (defaults to the current kubeconfig namespace)")
+	_ = cmd.RegisterFlagCompletionFunc("node", completeNodes)
+	_ = cmd.RegisterFlagCompletionFunc("namespace", completeNamespaces)
+	cmd.SetVersionTemplate("k8s-neighbours {{.Version}}\n")
 
-	if (*podName == "") == (*nodeName == "") {
-		flag.Usage()
-		return fmt.Errorf("exactly one of -pod or -node is required")
-	}
+	return cmd
+}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	config, ns, err := buildConfig(*namespace)
+func run(ctx context.Context, podName, nodeName, namespace string) error {
+	client, ns, err := buildClient(namespace)
 	if err != nil {
 		return err
 	}
 
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("creating Kubernetes client: %w", err)
-	}
-
-	node := *nodeName
-	if *podName != "" {
-		node, err = neighbours.ResolveNode(ctx, client, ns, *podName)
+	node := nodeName
+	if podName != "" {
+		node, err = neighbours.ResolveNode(ctx, client, ns, podName)
 		if err != nil {
 			return err
 		}
@@ -88,6 +98,73 @@ func run() error {
 		return err
 	}
 	return neighbours.Render(os.Stdout, rows)
+}
+
+// completePods completes the positional pod argument from the live cluster,
+// using the --namespace flag value when set.
+func completePods(namespace *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		client, ns, err := buildClient(*namespace)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		pods, err := client.CoreV1().Pods(ns).List(cmd.Context(), metav1.ListOptions{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		names := make([]string, 0, len(pods.Items))
+		for _, pod := range pods.Items {
+			names = append(names, pod.Name)
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeNodes(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	client, _, err := buildClient("")
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	nodes, err := client.CoreV1().Nodes().List(cmd.Context(), metav1.ListOptions{})
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	names := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		names = append(names, node.Name)
+	}
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeNamespaces(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	client, _, err := buildClient("")
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	namespaces, err := client.CoreV1().Namespaces().List(cmd.Context(), metav1.ListOptions{})
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	names := make([]string, 0, len(namespaces.Items))
+	for _, ns := range namespaces.Items {
+		names = append(names, ns.Name)
+	}
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+func buildClient(namespace string) (kubernetes.Interface, string, error) {
+	config, ns, err := buildConfig(namespace)
+	if err != nil {
+		return nil, "", err
+	}
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, "", fmt.Errorf("creating Kubernetes client: %w", err)
+	}
+	return client, ns, nil
 }
 
 // buildConfig returns a rest.Config (in-cluster first, kubeconfig fallback)

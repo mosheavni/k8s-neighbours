@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Shell completion shim for the kubectl plugin form (kubectl neighbours <TAB>).
+# kubectl >= 1.26 looks for kubectl_complete-<plugin> on PATH and calls it
+# with the words to complete; delegate to cobra's hidden __complete command.
+exec kubectl-neighbours __complete "$@"

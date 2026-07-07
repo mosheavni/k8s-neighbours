@@ -14,15 +14,16 @@ make test             # go test -race -coverprofile=coverage.out ./...
 make lint             # golangci-lint run (config in .golangci.yml, v2 format)
 make fmt              # gofmt -w .
 make snapshot         # goreleaser release --snapshot --clean (local multi-platform build)
-go run . -pod <pod_name> [-namespace <ns>]   # run against a pod
-go run . -node <node_name>                   # run against a node
+make install-completions  # generate bash/zsh/fish completions into user-level dirs (idempotent)
+go run . <pod_name> [-n <ns>]                # run against a pod (positional)
+go run . --node <node_name>                  # run against a node
 ```
 
 Running against a cluster requires a reachable Kubernetes cluster (kubeconfig or in-cluster). Tests do not — they use the fake clientset. Go version comes from `go.mod` (also pinned in `.go-version`).
 
 ## Architecture
 
-- `main.go` — thin entrypoint: flag parsing (`-pod`/`-node` mutually exclusive, one required; `-namespace`; `-version`), signal-aware context, client config (in-cluster first, kubeconfig fallback; namespace defaults from kubeconfig context or the in-cluster serviceaccount namespace file). Errors go to stderr via the `run() error` pattern. `version`/`commit`/`date` vars are injected by GoReleaser ldflags.
+- `main.go` — cobra entrypoint: positional pod name XOR `--node` (one required); `-n/--namespace`; `--version`. Signal-aware context via `ExecuteContext`, client config (in-cluster first, kubeconfig fallback; namespace defaults from kubeconfig context or the in-cluster serviceaccount namespace file). Errors go to stderr via `SilenceErrors` + the `run() error` pattern. Dynamic shell completion queries the live cluster (pods for the positional arg, nodes/namespaces for the flags); `hack/kubectl_complete-neighbours` is the kubectl ≥1.26 plugin-completion shim, shipped in release archives. `version`/`commit`/`date` vars are injected by GoReleaser ldflags.
 - `internal/neighbours/` — testable logic taking `kubernetes.Interface`:
   - `ResolveNode` — pod → node via `pod.Spec.NodeName`
   - `ListNeighbours` — lists pods cluster-wide with field selector `spec.nodeName=<node>`, builds `PodRow`s (READY count, kubectl-like STATUS, AGE via `duration.HumanDuration`)
